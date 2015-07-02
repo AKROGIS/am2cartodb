@@ -45,7 +45,11 @@ def make_cartodb_tracking_table(connection):
     sql = "create table Locations_In_CartoDB (fixid int NOT NULL PRIMARY KEY)"
     wcursor = connection.cursor()
     wcursor.execute(sql)
-    wcursor.commit()
+    try:
+        wcursor.commit()
+    except pyodbc.Error as de:
+        print ("Database error ocurred", de)
+        print ("Unable to add create the 'Locations_In_CartoDB' table.")
 
 
 def add_ids_to_carto_tracking_table(connection, fids):
@@ -55,18 +59,27 @@ def add_ids_to_carto_tracking_table(connection, fids):
         sql = sql.format(fid)
         # print(sql)
         wcursor.execute(sql)
-    wcursor.commit()
+    try:
+        wcursor.commit()
+    except pyodbc.Error as de:
+        print ("Database error ocurred", de)
+        print ("Unable to add these ids to the 'Locations_In_CartoDB' table.")
+        print (fids)
 
 
 def get_locations_for_carto(connection):
-    sql = ("select projectid,animalid,l.fixid,fixdate,location.Lat,Location.Long "
-           "from locations as l "
+    sql = ("select projectid,animalid,l.fixid,fixdate,"
+           "location.Lat,Location.Long from locations as l "
            "left join Locations_In_CartoDB as c on l.fixid = c.fixid "
            "where ProjectID = 'KATM_BrownBear' and c.fixid IS NULL "
            "and [status] IS NULL")
-    # TODO Make sure we are not passing any locations outside the park < 30 days
+    # TODO ensure we are not passing any locations outside the park < 30 days
     rcursor = connection.cursor()
-    rows = rcursor.execute(sql).fetchall()
+    try:
+        rows = rcursor.execute(sql).fetchall()
+    except pyodbc.Error as de:
+        print ("Database error ocurred", de)
+        rows = None
     return rows
 
 
@@ -76,18 +89,29 @@ def fixlocationrow(row):
 
 
 def insert(am, carto, rows):
-    sql = "insert into animal_locations (projectid,animalid,fixid,fixdate,the_geom) values "
-    ids, values = zip(*[(row[2],fixlocationrow(row)) for row in rows])
+    if not rows:
+        print('No new locations to send to CartoDB.')
+        return
+    sql = ("insert into animal_locations "
+           "(projectid,animalid,fixid,fixdate,the_geom) values ")
+    ids, values = zip(*[(row[2], fixlocationrow(row)) for row in rows])
     values = ','.join(values)
     try:
         carto.sql(sql + values)
-        add_ids_to_carto_tracking_table(am, ids)
-    except CartoDBException as e:
-        print ("some CartoDB error ocurred", e)
+        try:
+            add_ids_to_carto_tracking_table(am, ids)
+            print('Wrote ' + str(len(ids)) + ' locations to CartoDB.')
+        except pyodbc.Error as de:
+            print ("Database error ocurred", de)
+    except CartoDBException as ce:
+        print ("CartoDB error ocurred", ce)
 
 
-cl = CartoDBAPIKey(secrets.apikey, secrets.domain)
-conn = get_connection_or_die()
-# make_cartodb_tracking_table(conn)
-rows = get_locations_for_carto(conn)
-insert(conn,cl,rows)
+carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
+am_conn = get_connection_or_die()
+# make_cartodb_tracking_table(am_conn)
+locations = get_locations_for_carto(am_conn)
+insert(am_conn, carto_conn, locations)
+
+# TODO add movement vectors
+# TODO if status changes, then I should update locations (and vectors)
