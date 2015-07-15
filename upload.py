@@ -41,6 +41,26 @@ def get_connection_or_die():
     return connection
 
 
+def make_location_table_in_cartodb(carto):
+    sql = ("CREATE TABLE Animal_Locations (ProjectId text NOT NULL, AnimalId text NOT NULL, "
+           "FixDate timestamp NOT NULL, FixId int NOT NULL)")
+    execute_sql_in_cartodb(carto, sql)
+
+
+def make_movement_table_in_cartodb(carto):
+    sql = ("CREATE TABLE Animal_Movements (ProjectId text NOT NULL, AnimalId text NOT NULL, "
+           "StartDate timestamp NOT NULL, EndDate timestamp NOT NULL, Duration real NOT NULL, "
+           "Distance real NOT NULL, Speed real NOT NULL)")
+    execute_sql_in_cartodb(carto, sql)
+
+
+def execute_sql_in_cartodb(carto, sql):
+    try:
+        carto.sql(sql)
+    except CartoDBException as ce:
+        print ("CartoDB error ocurred", ce)
+
+
 def make_cartodb_tracking_table(connection):
     sql = "create table Locations_In_CartoDB (fixid int NOT NULL PRIMARY KEY)"
     wcursor = connection.cursor()
@@ -83,26 +103,55 @@ def get_locations_for_carto(connection):
     return rows
 
 
+def get_vectors_for_carto(connection):
+    sql = ("select m.Projectid, m.AnimalId, m.StartDate, m.EndDate, m.Duration, m.Distance, m.Speed, "
+           "m.Shape.ToString() from movements as m left join locations as l "
+           "on m.ProjectId = l.ProjectId and m.AnimalId = l.AnimalId and m.EndDate = l.FixDate "
+           "left join Locations_In_CartoDB as c on l.fixid = c.fixid "
+           "where M.ProjectId = 'KATM_BrownBear' and c.fixid IS NOT NULL and Distance > 0")
+    # TODO ensure we are not passing any locations outside the park < 30 days
+    rcursor = connection.cursor()
+    try:
+        rows = rcursor.execute(sql).fetchall()
+    except pyodbc.Error as de:
+        print ("Database error ocurred", de)
+        rows = None
+    return rows
+
+
 def fixlocationrow(row):
     s = "('{0}','{1}',{2},'{3}',ST_SetSRID(ST_Point({5},{4}),4326))"
     return s.format(*row)
 
 
-def insert(am, carto, rows):
-    if not rows:
-        print('No new locations to send to CartoDB.')
+def fixmovementrow(row):
+    s = "('{0}','{1}','{2}','{3}',{4},{5},{6},ST_GeometryFromText('{7}',4326))"
+    return s.format(*row)
+
+
+def insert(am, carto, lrows, vrows):
+    if not lrows and not vrows:
+        print('No new data to send to CartoDB.')
         return
-    sql = ("insert into animal_locations "
-           "(projectid,animalid,fixid,fixdate,the_geom) values ")
-    ids, values = zip(*[(row[2], fixlocationrow(row)) for row in rows])
-    values = ','.join(values)
     try:
-        carto.sql(sql + values)
-        try:
-            add_ids_to_carto_tracking_table(am, ids)
-            print('Wrote ' + str(len(ids)) + ' locations to CartoDB.')
-        except pyodbc.Error as de:
-            print ("Database error ocurred", de)
+        if vrows:
+            sql = ("insert into animal_movements "
+                   "(projectid, animalid, startdate, enddate, duration, distance, speed, the_geom) values ")
+            values = ','.join([fixmovementrow(row) for row in vrows])
+            # print sql + values
+            carto.sql(sql + values)
+        if lrows:
+            sql = ("insert into animal_locations "
+                   "(projectid,animalid,fixid,fixdate,the_geom) values ")
+            ids, values = zip(*[(row[2], fixlocationrow(row)) for row in lrows])
+            values = ','.join(values)
+            # print sql + values
+            carto.sql(sql + values)
+            try:
+                add_ids_to_carto_tracking_table(am, ids)
+                print('Wrote ' + str(len(ids)) + ' locations to CartoDB.')
+            except pyodbc.Error as de:
+                print ("Database error ocurred", de)
     except CartoDBException as ce:
         print ("CartoDB error ocurred", ce)
 
@@ -111,7 +160,9 @@ carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
 am_conn = get_connection_or_die()
 # make_cartodb_tracking_table(am_conn)
 locations = get_locations_for_carto(am_conn)
-insert(am_conn, carto_conn, locations)
+vectors = get_vectors_for_carto(am_conn)
+insert(am_conn, carto_conn, locations, vectors)
+
 
 # TODO add movement vectors
 # TODO if status changes, then I should update locations (and vectors)
