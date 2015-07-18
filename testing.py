@@ -6,6 +6,9 @@ __author__ = 'RESarwas'
 import secrets
 from cartodb import CartoDBAPIKey, CartoDBException
 
+# example sql in browser:
+# https://nps-akro-gis.cartodb.com/api/v2/sql?api_key=XXX&q=update animal_movements set duration_t=round(cast(duration as numeric),1)
+
 def test(c):
     #sql = "CREATE TABLE Animal_Locations (ProjectId text NOT NULL,AnimalId text NOT NULL,FixDate timestamp NOT NULL,FixId int NOT NULL)"
     #sql = "select cdb_cartodbfytable('"+secrets.domain+"','Animal_Locations')"
