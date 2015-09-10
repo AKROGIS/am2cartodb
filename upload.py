@@ -127,7 +127,7 @@ def add_movements_to_carto_tracking_table(connection, rows):
 def remove_locations_from_carto_tracking_table(connection, fids):
     wcursor = connection.cursor()
     sql = "delete from Locations_In_CartoDB where fixid in "
-    ids = '(' + ','.join(fids) + ')'
+    ids = '(' + ','.join([str(id) for id in fids]) + ')'
     wcursor.execute(sql+ids)
     try:
         wcursor.commit()
@@ -276,8 +276,8 @@ def remove(am, carto, lrows, vrows):
         try:
             sql = "delete from animal_locations where fixid in "
             ids = [row[0] for row in lrows]
-            ids = '(' + ','.join(ids) + ')'
-            carto.sql(sql + ids)
+            idstr = '(' + ','.join([str(id) for id in ids]) + ')'
+            carto.sql(sql + idstr)
             try:
                 remove_locations_from_carto_tracking_table(am, ids)
                 print('Removed ' + str(len(ids)) + ' locations from CartoDB.')
