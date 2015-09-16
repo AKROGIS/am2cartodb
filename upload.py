@@ -1,12 +1,13 @@
-__author__ = 'RESarwas'
 import sys
+import secrets
+
+__author__ = 'RESarwas'
 
 # dependency pyodbc
 # C:\Python27\ArcGIS10.3\Scripts\pip.exe install pyodbc
 # dependency cartodb
 # C:\Python27\ArcGIS10.3\Scripts\pip.exe install cartodb
 
-import secrets
 
 try:
     from cartodb import CartoDBAPIKey, CartoDBException
