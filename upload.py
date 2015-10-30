@@ -164,22 +164,28 @@ def fetch_rows(connection, sql):
 
 
 def get_locations_for_carto(connection, project):
-    sql = ("select l.projectid,l.animalid,l.fixid,l.fixdate,"
-           "location.Lat,Location.Long from locations as l "
-           "inner join ProjectExportBoundaries as b on l.Location.STIntersects(b.Shape) = 1 "
+    sql = ("select l.projectid, l.animalid, l.fixid, l.fixdate,"
+           "location.Lat, Location.Long from locations as l "
+           "left join ProjectExportBoundaries as b on b.Project = l.ProjectId "
            "left join Locations_In_CartoDB as c on l.fixid = c.fixid "
-           "where l.ProjectID = '" + project + "' and c.fixid IS NULL and l.[status] IS NULL")
+           "where c.FixId is null "  # not in CartoDB
+           "and l.ProjectID = '" + project + "' "  # belongs to project
+           "and l.[status] IS NULL "  # not hidden
+           "and (b.shape is null or b.Shape.STContains(l.Location) = 1)")  # inside boundary
     return fetch_rows(connection, sql)
 
 
 def get_vectors_for_carto(connection, project):
     sql = ("select m.Projectid, m.AnimalId, m.StartDate, m.EndDate, m.Duration, m.Distance, m.Speed, "
            "m.Shape.ToString() from movements as m "
-           "inner join ProjectExportBoundaries as b on m.Shape.STIntersects(b.Shape) = 1 "
+           "inner join ProjectExportBoundaries as b on b.Project = m.ProjectId "
            "left join Movements_In_CartoDB as c "
            "on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId "
            "and m.StartDate = c.StartDate and m.EndDate = c.EndDate "
-           "where m.ProjectId = '" + project + "' and c.ProjectId IS NULL and Distance > 0")
+           "where c.ProjectId IS NULL "  # not in CartoDB
+           "and m.ProjectId = '" + project + "' "  # belongs to project
+           "and Distance > 0 "  # not a degenerate
+           "and (b.shape is null or b.Shape.STContains(m.shape) = 1)")  # inside boundary
     return fetch_rows(connection, sql)
 
 
@@ -232,23 +238,26 @@ def insert(am, carto, lrows, vrows):
 
 
 def get_locations_to_remove(connection, project):
-    # status is the only mutable field in the locations table, so that is all we need to check
-    # if the boundary changes, then clear then kill and fill
-    sql = ("select l.fixid from locations as l "
-           "left join Locations_In_CartoDB as c on l.fixid = c.fixid "
-           "where ProjectID = '" + project + "' and c.fixid IS NOT NULL "
-           "and [status] IS NOT NULL")
+    # check the list of location in Cartodb with the current status of locations
+    sql = ("select c.fixid from Locations_In_CartoDB as c "
+           "left join Locations as l on l.FixId = c.fixid "
+           "left join ProjectExportBoundaries as b on b.Project = l.ProjectId "
+           "where l.FixId is null "  # not in location table any longer
+           "or l.status is not null "  # location is now hidden
+           "or (b.shape is not null and b.shape.STContains(l.Location) = 0)")  # location is now outside boundary
     return fetch_rows(connection, sql)
 
 
 def get_vectors_to_remove(connection, project):
-    # movement records are immutable, however changes to location status add/delete records
-    # if the boundary changes, then clear then kill and fill
+    # check the list of movements in Cartodb with the current movements table
+    # note: the attributes of a movement are immutable
     sql = ("select c.Projectid, c.AnimalId, c.StartDate, c.EndDate "
            "from Movements_In_CartoDB as c left join movements as m "
            "on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId "
            "and m.StartDate = c.StartDate and m.EndDate = c.EndDate "
-           "where c.ProjectId = '" + project + "' and m.projectid is null")
+           "left join ProjectExportBoundaries as b on b.Project = m.ProjectId "
+           "where m.projectid is null "  # not in movement database anylonger
+           "or (b.shape is not null and b.shape.STContains(m.shape) = 0)")  # location is now outside boundary
     return fetch_rows(connection, sql)
 
 
