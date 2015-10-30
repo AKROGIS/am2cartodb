@@ -237,7 +237,7 @@ def insert(am, carto, lrows, vrows):
             print ("CartoDB error ocurred", ce)
 
 
-def get_locations_to_remove(connection, project):
+def get_locations_to_remove(connection):
     # check the list of location in Cartodb with the current status of locations
     sql = ("select c.fixid from Locations_In_CartoDB as c "
            "left join Locations as l on l.FixId = c.fixid "
@@ -248,7 +248,7 @@ def get_locations_to_remove(connection, project):
     return fetch_rows(connection, sql)
 
 
-def get_vectors_to_remove(connection, project):
+def get_vectors_to_remove(connection):
     # check the list of movements in Cartodb with the current movements table
     # note: the attributes of a movement are immutable
     sql = ("select c.Projectid, c.AnimalId, c.StartDate, c.EndDate "
@@ -320,10 +320,10 @@ def make_sqlserver_tables():
 def main():
     carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
     am_conn = get_connection_or_die()
+    locations = get_locations_to_remove(am_conn)
+    vectors = get_vectors_to_remove(am_conn)
+    remove(am_conn, carto_conn, locations, vectors)
     for project in ['KATM_BrownBear']:
-        locations = get_locations_to_remove(am_conn, project)
-        vectors = get_vectors_to_remove(am_conn, project)
-        remove(am_conn, carto_conn, locations, vectors)
         locations = get_locations_for_carto(am_conn, project)
         vectors = get_vectors_for_carto(am_conn, project)
         insert(am_conn, carto_conn, locations, vectors)
