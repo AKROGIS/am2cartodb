@@ -1,29 +1,32 @@
 import sys
+import os
 import secrets
 
 __author__ = 'RESarwas'
 
-# dependency pyodbc
-# C:\Python27\ArcGIS10.3\Scripts\pip.exe install pyodbc
-# dependency cartodb
-# C:\Python27\ArcGIS10.3\Scripts\pip.exe install cartodb
+
+def module_missing(name):
+    print 'Module {0} not found, make sure it is installed.'.format(name)
+    exec_dir = os.path.split(sys.executable)[0]
+    pip = os.path.join(exec_dir, 'Scripts', 'pip.exe')
+    if not os.path.exists(pip):
+        print ("First install pip. See instructions at: "
+               "'https://pip.pypa.io/en/stable/installing/'.")
+    print 'Install with: {0} install {1}'.format(pip, name)
+    sys.exit()
 
 
 try:
     from cartodb import CartoDBAPIKey, CartoDBException
 except ImportError:
     CartoDBAPIKey, CartoDBException = None, None
-    print 'cartodb module not found, make sure it is installed with'
-    print 'C:\Python27\ArcGIS10.3\Scripts\pip.exe install cartodb'
-    sys.exit()
+    module_missing('cartodb')
 
 try:
     import pyodbc
 except ImportError:
     pyodbc = None
-    print 'pyodbc module not found, make sure it is installed with'
-    print 'C:\Python27\ArcGIS10.3\Scripts\pip.exe install pyodbc'
-    sys.exit()
+    module_missing('pyodbc')
 
 
 def get_connection_or_die():
