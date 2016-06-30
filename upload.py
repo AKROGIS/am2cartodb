@@ -30,7 +30,7 @@ except ImportError:
 
 
 def get_connection_or_die():
-    conn_string = ("DRIVER={{SQL Server Native Client 10.0}};"
+    conn_string = ("DRIVER={{SQL Server Native Client 11.0}};"
                    "SERVER={0};DATABASE={1};Trusted_Connection=Yes;")
     conn_string = conn_string.format('inpakrovmais', 'animal_movement')
     try:
