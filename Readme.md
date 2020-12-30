@@ -36,16 +36,16 @@ team network drive.
 
 The code requires tables be created in the source database
 and on the Cartodb server.  Those tables have already been
-created for the current configuration.  (Using the
+created for the current configuration.  (Using the commented out
 [first two lines](https://github.com/regan-sarwas/am2cartodb/blob/55be163f56805e5ca0f063dcfa8ba3c350895f90/upload.py#L345-L346)
-of the main function in `upload.py` that are now commented out.)
+of the main function in `upload.py`.)
 If this code is being used in a new configuration, it will
 require a lot of modification, as the existing DB schema is
 hard coded throughout the file.
 
 ## Using
 
-Once the tables have been created, the upload.py script can
+Once the tables have been created, the `upload.py` script can
 be run as often as desired.  It is running daily as a scheduled
 task on the AKRO GIS servers.  It needs to be run with an
-account the has viewer privileges in the source database.
+account that has viewer privileges in the source database.
