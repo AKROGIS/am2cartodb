@@ -37,7 +37,7 @@ team network drive.
 The code requires tables be created in the source database
 and on the Cartodb server.  Those tables have already been
 created for the current configuration.  (Using the commented out
-[first two lines](https://github.com/regan-sarwas/am2cartodb/blob/55be163f56805e5ca0f063dcfa8ba3c350895f90/upload.py#L345-L346)
+[first two lines](https://github.com/AKROGIS/am2cartodb/blob/55be163f56805e5ca0f063dcfa8ba3c350895f90/upload.py#L345-L346)
 of the main function in `upload.py`.)
 If this code is being used in a new configuration, it will
 require a lot of modification, as the existing DB schema is
