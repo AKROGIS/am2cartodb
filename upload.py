@@ -1,18 +1,41 @@
-import sys
-import os
-import secrets
+# -*- coding: utf-8 -*-
+"""
+A python tool for publishing select data from the
+[Animal Movement](https://github.com/AKROGIS/AnimalMovement)
+database (an internal SQL Server) to a public [Carto](https://carto.com)
+database.  The tool keeps track of what data has already been published, and
+only pushes changes since the last run.  It is best run as a scheduled task.
 
-__author__ = 'RESarwas'
+Biologists with data in Animal Movements must elect to publish their data to
+Carto.  Currently only the Katmai Bear data is being published. Locations are
+filtered by project and location (if an animal goes outside the protection of
+the park, its location is not published).
+
+You must have a Carto (https://carto.com) (formerly Cartodb) account and
+apikey - these are set in the `secrets.py` file.  See `testing_carto.py`
+for a simple example, with explanaitons.
+
+Third party requirements:
+* carto - https://pypi.python.org/pypi/carto  (formerly cartodb)
+* pyodbc - https://pypi.python.org/pypi/pyodbc - for SQL Server
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import os
+import sys
+
+import secrets
 
 
 def module_missing(name):
-    print 'Module {0} not found, make sure it is installed.'.format(name)
+    print('Module {0} not found, make sure it is installed.'.format(name))
     exec_dir = os.path.split(sys.executable)[0]
     pip = os.path.join(exec_dir, 'Scripts', 'pip.exe')
     if not os.path.exists(pip):
-        print ("First install pip. See instructions at: "
+        print("First install pip. See instructions at: "
                "'https://pip.pypa.io/en/stable/installing/'.")
-    print 'Install with: {0} install {1}'.format(pip, name)
+    print('Install with: {0} install {1}'.format(pip, name))
     sys.exit()
 
 
@@ -119,7 +142,7 @@ def add_movements_to_carto_tracking_table(connection, rows):
     sql = "insert into Movements_In_CartoDB (projectid, animalid, startdate, enddate) values "
     for chunk in chunks(rows, 900):
         values = ','.join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
-        # print sql + values
+        # print(sql + values)
         wcursor.execute(sql + values)
     try:
         wcursor.commit()
@@ -219,7 +242,7 @@ def insert(am, carto, lrows, vrows):
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(vrows, 900):
                 values = ','.join([fixmovementrow(row) for row in chunk])
-                # print sql + values
+                # print(sql + values)
                 carto.sql(sql + values)
             try:
                 add_movements_to_carto_tracking_table(am, vrows)
@@ -236,7 +259,7 @@ def insert(am, carto, lrows, vrows):
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(values, 900):
                 vals = ','.join(chunk)
-                # print sql + vals
+                # (sql + vals)
                 carto.sql(sql + vals)
             try:
                 add_locations_to_carto_tracking_table(am, ids)

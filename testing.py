@@ -1,13 +1,34 @@
-__author__ = 'RESarwas'
+# -*- coding: utf-8 -*-
+"""
+Simple tests of the Carto (SQL based mapping database) API.
 
-# dependency cartodb
-# C:\Python27\ArcGIS10.3\Scripts\pip.exe install cartodb
+You must have a Carto (https://carto.com) (formerly Cartodb) account and
+apikey - these are set in the secrets.py file.  Note that the apikey is not
+required for select statements on a public table.
 
-import secrets
+The Carto module provides a connection that acts like a database server e.i. it
+takes an SQL statement and returns a list of rows by wraps a ReST request and
+response.
+
+Example SQL request in the browser:
+  domain = {domain} aka username
+  apikey = {apikey}
+  sql = {sql}
+  https://{domain}.carto.com/api/v2/sql?api_key={apikey}&q={sql}
+
+Third party requirements:
+* carto - https://pypi.python.org/pypi/carto  (formerly cartodb)
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from cartodb import CartoDBAPIKey, CartoDBException
 
+import secrets
+
+
 # example sql in browser:
-# https://nps-akro-gis.cartodb.com/api/v2/sql?api_key=XXX&q=update animal_movements set duration_t=round(cast(duration as numeric),1)
+# https://{domain}.cartodb.com/api/v2/sql?api_key={apikey}&q=update animal_movements set duration_t=round(cast(duration as numeric),1)
 
 def test(c):
     #sql = "CREATE TABLE Animal_Locations (ProjectId text NOT NULL,AnimalId text NOT NULL,FixDate timestamp NOT NULL,FixId int NOT NULL)"
@@ -20,10 +41,9 @@ def test(c):
     sql = 'select * from animal_movements'
     #sql = "update animal_locations set the_geom=ST_SetSRID(ST_Point(-153.900132,58.577771),4326) where cartodb_id = 1"
     try:
-       print c.sql(sql)
+       print(c.sql(sql))
     except CartoDBException as e:
        print ("some error ocurred", e)
 
 carto = CartoDBAPIKey(secrets.apikey, secrets.domain)
 test(carto)
-
