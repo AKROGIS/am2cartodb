@@ -68,12 +68,12 @@ def get_connection_or_die():
     conn_string = conn_string.format("inpakrovmais", "animal_movement")
     try:
         connection = pyodbc.connect(conn_string)
-    except pyodbc.Error as e:
+    except pyodbc.Error as ex:
         print("Rats!!  Unable to connect to the database.")
         print("Make sure your AD account has the proper DB permissions.")
         print("Contact Regan (regan_sarwas@nps.gov) for assistance.")
         print("  Connection: " + conn_string)
-        print("  Error: " + e[1])
+        print("  Error: {0}".format(ex))
         sys.exit()
     return connection
 
@@ -105,14 +105,14 @@ def make_movement_table_in_cartodb(carto):
 def execute_sql_in_cartodb(carto, sql):
     try:
         carto.sql(sql)
-    except CartoDBException as ce:
-        print("CartoDB error ocurred", ce)
+    except CartoDBException as ex:
+        print("CartoDB error ocurred", ex)
 
 
-def chunks(l, n):
-    """Yield successive n-sized chunks from list l."""
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
+def chunks(items, count):
+    """Yield successive count-sized chunks from list items."""
+    for i in range(0, len(items), count):
+        yield items[i : i + count]
 
 
 def make_cartodb_tracking_tables(connection):
@@ -135,8 +135,8 @@ def make_cartodb_tracking_tables(connection):
     wcursor.execute(sql2)
     try:
         wcursor.commit()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         print("Unable to add create the 'Locations_In_CartoDB' table.")
 
 
@@ -150,8 +150,8 @@ def add_locations_to_carto_tracking_table(connection, fids):
         wcursor.execute(sql + values)
     try:
         wcursor.commit()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         print("Unable to add these ids to the 'Locations_In_CartoDB' table.")
         print(fids)
 
@@ -164,13 +164,13 @@ def add_movements_to_carto_tracking_table(connection, rows):
         (projectid, animalid, startdate, enddate) values
     """
     for chunk in chunks(rows, 900):
-        values = ,".join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
+        values = ",".join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
         # print(sql + values)
         wcursor.execute(sql + " " + values)
     try:
         wcursor.commit()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         print("Unable to add these rows to the 'Movements_In_CartoDB' table.")
         print(rows)
 
@@ -184,8 +184,8 @@ def remove_locations_from_carto_tracking_table(connection, fids):
         wcursor.execute(sql + ids)
     try:
         wcursor.commit()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         print("Unable to delete these ids from the 'Locations_In_CartoDB' table.")
         print(fids)
 
@@ -202,8 +202,8 @@ def remove_movements_from_carto_tracking_table(connection, rows):
         wcursor.execute(sql1)
     try:
         wcursor.commit()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         print("Unable to delete these rows from the 'Movements_In_CartoDB' table.")
         print(rows)
 
@@ -212,8 +212,8 @@ def fetch_rows(connection, sql):
     rcursor = connection.cursor()
     try:
         rows = rcursor.execute(sql).fetchall()
-    except pyodbc.Error as de:
-        print("Database error ocurred", de)
+    except pyodbc.Error as ex:
+        print("Database error ocurred", ex)
         rows = None
     return rows
 
@@ -249,16 +249,16 @@ def get_vectors_for_carto(connection, project):
 
 
 def fixlocationrow(row):
-    s = "('{0}','{1}',{2},'{3}',ST_SetSRID(ST_Point({5},{4}),4326))"
-    return s.format(*row)
+    text = "('{0}','{1}',{2},'{3}',ST_SetSRID(ST_Point({5},{4}),4326))"
+    return text.format(*row)
 
 
 def fixmovementrow(row):
-    s = "('{0}','{1}','{2}','{3}',{4},{5},{6},ST_GeometryFromText('{7}',4326))"
-    return s.format(*row)
+    text = "('{0}','{1}','{2}','{3}',{4},{5},{6},ST_GeometryFromText('{7}',4326))"
+    return text.format(*row)
 
 
-def insert(am, carto, lrows, vrows):
+def insert(database, carto, lrows, vrows):
     if not lrows:
         print("No locations to send to CartoDB.")
     if not vrows:
@@ -278,12 +278,12 @@ def insert(am, carto, lrows, vrows):
                 # print(sql + values)
                 carto.sql(sql + values)
             try:
-                add_movements_to_carto_tracking_table(am, vrows)
+                add_movements_to_carto_tracking_table(database, vrows)
                 print("Wrote {0} movements to CartoDB.".format(len(vrows)))
-            except pyodbc.Error as de:
-                print("Database error ocurred", de)
-        except CartoDBException as ce:
-            print("CartoDB error ocurred", ce)
+            except pyodbc.Error as ex:
+                print("Database error ocurred", ex)
+        except CartoDBException as ex:
+            print("CartoDB error ocurred", ex)
     if lrows:
         try:
             sql = """
@@ -297,12 +297,12 @@ def insert(am, carto, lrows, vrows):
                 # (sql + vals)
                 carto.sql(sql + vals)
             try:
-                add_locations_to_carto_tracking_table(am, ids)
+                add_locations_to_carto_tracking_table(database, ids)
                 print("Wrote {0} locations to CartoDB.".format(len(ids)))
-            except pyodbc.Error as de:
-                print("Database error ocurred", de)
-        except CartoDBException as ce:
-            print("CartoDB error ocurred", ce)
+            except pyodbc.Error as ex:
+                print("Database error ocurred", ex)
+        except CartoDBException as ex:
+            print("CartoDB error ocurred", ex)
 
 
 def get_locations_to_remove(connection):
@@ -335,7 +335,7 @@ def get_vectors_to_remove(connection):
     return fetch_rows(connection, sql)
 
 
-def remove(am, carto, lrows, vrows):
+def remove(database, carto, lrows, vrows):
     if not lrows:
         print("No locations to remove from CartoDB.")
     if not vrows:
@@ -353,15 +353,15 @@ def remove(am, carto, lrows, vrows):
                 sql1 = sql.format(row[0], row[1], row[2], row[3])
                 carto.sql(sql1)
             try:
-                remove_movements_from_carto_tracking_table(am, vrows)
+                remove_movements_from_carto_tracking_table(database, vrows)
                 print("Removed {0} Movements from CartoDB.".format(len(vrows)))
-            except pyodbc.Error as de:
+            except pyodbc.Error as ex:
                 print(
                     "SQLServer error occurred.  Movements removed from CartoDB, but not SQLServer",
-                    de,
+                    ex,
                 )
-        except CartoDBException as ce:
-            print("CartoDB error occurred removing movements.", ce)
+        except CartoDBException as ex:
+            print("CartoDB error occurred removing movements.", ex)
     if lrows:
         try:
             sql = "delete from animal_locations where fixid in "
@@ -371,15 +371,15 @@ def remove(am, carto, lrows, vrows):
                 idstr = "(" + ",".join(["{0}".format(i) for i in chunk]) + ")"
                 carto.sql(sql + idstr)
             try:
-                remove_locations_from_carto_tracking_table(am, ids)
+                remove_locations_from_carto_tracking_table(database, ids)
                 print("Removed {0} locations from CartoDB.".format(len(ids)))
-            except pyodbc.Error as de:
+            except pyodbc.Error as ex:
                 print(
                     "SQLServer error occurred.  Locations removed from CartoDB, but not SQLServer",
-                    de,
+                    ex,
                 )
-        except CartoDBException as ce:
-            print("CartoDB error occurred removing locations.", ce)
+        except CartoDBException as ex:
+            print("CartoDB error occurred removing locations.", ex)
 
 
 def fix_format_of_vector_columns(carto):
