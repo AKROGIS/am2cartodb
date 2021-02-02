@@ -12,8 +12,8 @@ filtered by project and location (if an animal goes outside the protection of
 the park, its location is not published).
 
 You must have a Carto (https://carto.com) (formerly Cartodb) account and
-apikey - these are set in the `secrets.py` file.  See `testing_carto.py`
-for a simple example, with explanaitons.
+api key - these are set in the `secrets.py` file.  See `testing_carto.py`
+for a simple example, with explanations.
 
 Third party requirements:
 * carto - https://pypi.python.org/pypi/carto  (formerly cartodb)
@@ -129,11 +129,11 @@ def make_cartodb_tracking_tables(connection):
             CONSTRAINT PK_Movements_In_CartoDB PRIMARY KEY CLUSTERED (
               ProjectId ASC, AnimalId ASC, StartDate ASC, EndDate ASC))
     """
-    wcursor = connection.cursor()
-    wcursor.execute(sql)
-    wcursor.execute(sql2)
+    w_cursor = connection.cursor()
+    w_cursor.execute(sql)
+    w_cursor.execute(sql2)
     try:
-        wcursor.commit()
+        w_cursor.commit()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         print("Unable to add create the 'Locations_In_CartoDB' table.")
@@ -143,14 +143,14 @@ def add_locations_to_carto_tracking_table(connection, fids):
     """Execute SQL to track location fids on the SQL Server connection."""
 
     # SQL Server is limited to 1000 rows in an insert
-    wcursor = connection.cursor()
+    w_cursor = connection.cursor()
     sql = "INSERT Locations_In_CartoDB (fixid) values "
     for chunk in chunks(fids, 900):
         values = ",".join(["({0})".format(fid) for fid in chunk])
         # print(sql + values)
-        wcursor.execute(sql + values)
+        w_cursor.execute(sql + values)
     try:
-        wcursor.commit()
+        w_cursor.commit()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         print("Unable to add these ids to the 'Locations_In_CartoDB' table.")
@@ -161,7 +161,7 @@ def add_movements_to_carto_tracking_table(connection, rows):
     """Execute SQL to track movement rows on the SQL Server connection."""
 
     # SQL Server is limited to 1000 rows in an insert
-    wcursor = connection.cursor()
+    w_cursor = connection.cursor()
     sql = """
         insert into Movements_In_CartoDB
         (projectid, animalid, startdate, enddate) values
@@ -169,9 +169,9 @@ def add_movements_to_carto_tracking_table(connection, rows):
     for chunk in chunks(rows, 900):
         values = ",".join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
         # print(sql + values)
-        wcursor.execute(sql + " " + values)
+        w_cursor.execute(sql + " " + values)
     try:
-        wcursor.commit()
+        w_cursor.commit()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         print("Unable to add these rows to the 'Movements_In_CartoDB' table.")
@@ -181,14 +181,14 @@ def add_movements_to_carto_tracking_table(connection, rows):
 def remove_locations_from_carto_tracking_table(connection, fids):
     """Execute SQL to un-track location fids on the SQL Server connection."""
 
-    wcursor = connection.cursor()
+    w_cursor = connection.cursor()
     sql = "delete from Locations_In_CartoDB where fixid in "
     # Protection from really long lists, by executing multiple queries.
     for chunk in chunks(fids, 900):
         ids = "(" + ",".join(["{0}".format(fid) for fid in chunk]) + ")"
-        wcursor.execute(sql + ids)
+        w_cursor.execute(sql + ids)
     try:
-        wcursor.commit()
+        w_cursor.commit()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         print("Unable to delete these ids from the 'Locations_In_CartoDB' table.")
@@ -198,7 +198,7 @@ def remove_locations_from_carto_tracking_table(connection, fids):
 def remove_movements_from_carto_tracking_table(connection, rows):
     """Execute SQL to un-track movement rows on the SQL Server connection."""
 
-    wcursor = connection.cursor()
+    w_cursor = connection.cursor()
     sql = """
         delete from Movements_In_CartoDB where
         projectid = '{0}' and animalid = '{1}'
@@ -206,9 +206,9 @@ def remove_movements_from_carto_tracking_table(connection, rows):
     """
     for row in rows:
         sql1 = sql.format(row[0], row[1], row[2], row[3])
-        wcursor.execute(sql1)
+        w_cursor.execute(sql1)
     try:
-        wcursor.commit()
+        w_cursor.commit()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         print("Unable to delete these rows from the 'Movements_In_CartoDB' table.")
@@ -218,9 +218,9 @@ def remove_movements_from_carto_tracking_table(connection, rows):
 def fetch_rows(connection, sql):
     """Execute SQL statement sql on the SQL Server connection and return rows."""
 
-    rcursor = connection.cursor()
+    r_cursor = connection.cursor()
     try:
-        rows = rcursor.execute(sql).fetchall()
+        rows = r_cursor.execute(sql).fetchall()
     except pyodbc.Error as ex:
         print("Database error ocurred", ex)
         rows = None
@@ -275,20 +275,20 @@ def fixmovementrow(row):
     return text.format(*row)
 
 
-def insert(database, carto, lrows, vrows):
+def insert(database, carto, l_rows, v_rows):
     """
     Send locations and movement vectors from connection to carto.
 
-    locations (lrows) and movement vectors (vrows) will be marked as tracked
+    locations (l_rows) and movement vectors (v_rows) will be marked as tracked
     on the source SQL Server connection and inserted on the tables on carto.
     """
-    if not lrows:
+    if not l_rows:
         print("No locations to send to CartoDB.")
-    if not vrows:
+    if not v_rows:
         print("No movements to send to CartoDB.")
-    if not lrows and not vrows:
+    if not l_rows and not v_rows:
         return
-    if vrows:
+    if v_rows:
         try:
             sql = """
                 insert into animal_movements
@@ -296,29 +296,29 @@ def insert(database, carto, lrows, vrows):
                 distance, speed, the_geom) values
             """
             # Protection from really long lists, by executing multiple queries.
-            for chunk in chunks(vrows, 900):
+            for chunk in chunks(v_rows, 900):
                 values = ",".join([fixmovementrow(row) for row in chunk])
                 # print(sql + values)
                 carto.sql(sql + values)
             try:
-                add_movements_to_carto_tracking_table(database, vrows)
-                print("Wrote {0} movements to CartoDB.".format(len(vrows)))
+                add_movements_to_carto_tracking_table(database, v_rows)
+                print("Wrote {0} movements to CartoDB.".format(len(v_rows)))
             except pyodbc.Error as ex:
                 print("Database error ocurred", ex)
         except CartoDBException as ex:
             print("CartoDB error ocurred", ex)
-    if lrows:
+    if l_rows:
         try:
             sql = """
                 insert into animal_locations
                 (projectid,animalid,fixid,fixdate,the_geom) values
             """
-            ids, values = zip(*[(row[2], fixlocationrow(row)) for row in lrows])
+            ids, values = zip(*[(row[2], fixlocationrow(row)) for row in l_rows])
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(values, 900):
-                vals = ",".join(chunk)
-                # (sql + vals)
-                carto.sql(sql + vals)
+                values = ",".join(chunk)
+                # (sql + values)
+                carto.sql(sql + values)
             try:
                 add_locations_to_carto_tracking_table(database, ids)
                 print("Wrote {0} locations to CartoDB.".format(len(ids)))
@@ -332,7 +332,7 @@ def get_locations_to_remove(connection):
     """
     Return the locations in SQL Server connection that should be removed from carto.
 
-    Check the list of location in Cartodb with the current status of locations
+    Check the list of location in Carto with the current status of locations
     (hidden or deleted) or the boundary shape may have changed.
     """
     sql = """
@@ -350,7 +350,7 @@ def get_vectors_to_remove(connection):
     """
     Return the movements in SQL Server connection that should be removed from carto.
 
-    Check the list of movements in Cartodb with the current status of movements
+    Check the list of movements in Carto with the current status of movements
     (deleted) or the boundary shape may have changed. Note: the attributes of a
     movement are immutable, so we do not need to check them.
     """
@@ -366,32 +366,32 @@ def get_vectors_to_remove(connection):
     return fetch_rows(connection, sql)
 
 
-def remove(database, carto, lrows, vrows):
+def remove(database, carto, l_rows, v_rows):
     """
     Remove locations and movement vectors from carto.
 
-    locations (lrows) and movement vectors (vrows) will be marked as un-tracked
+    locations (l_rows) and movement vectors (v_rows) will be marked as un-tracked
     on the source SQL Server connection and removed from the tables on carto.
     """
-    if not lrows:
+    if not l_rows:
         print("No locations to remove from CartoDB.")
-    if not vrows:
+    if not v_rows:
         print("No movements to remove from CartoDB.")
-    if not lrows and not vrows:
+    if not l_rows and not v_rows:
         return
-    if vrows:
+    if v_rows:
         try:
             sql = """
                 delete from animal_movements where
                 projectid = '{0}' and animalid = '{1}'
                 and startdate = '{2}' and enddate = '{3}'
             """
-            for row in vrows:
+            for row in v_rows:
                 sql1 = sql.format(row[0], row[1], row[2], row[3])
                 carto.sql(sql1)
             try:
-                remove_movements_from_carto_tracking_table(database, vrows)
-                print("Removed {0} Movements from CartoDB.".format(len(vrows)))
+                remove_movements_from_carto_tracking_table(database, v_rows)
+                print("Removed {0} Movements from CartoDB.".format(len(v_rows)))
             except pyodbc.Error as ex:
                 print(
                     "SQLServer error occurred.  Movements removed from CartoDB, but not SQLServer",
@@ -399,14 +399,14 @@ def remove(database, carto, lrows, vrows):
                 )
         except CartoDBException as ex:
             print("CartoDB error occurred removing movements.", ex)
-    if lrows:
+    if l_rows:
         try:
             sql = "delete from animal_locations where fixid in "
-            ids = [row[0] for row in lrows]
+            ids = [row[0] for row in l_rows]
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(ids, 900):
-                idstr = "(" + ",".join(["{0}".format(i) for i in chunk]) + ")"
-                carto.sql(sql + idstr)
+                id_str = "(" + ",".join(["{0}".format(i) for i in chunk]) + ")"
+                carto.sql(sql + id_str)
             try:
                 remove_locations_from_carto_tracking_table(database, ids)
                 print("Removed {0} locations from CartoDB.".format(len(ids)))
