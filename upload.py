@@ -79,22 +79,24 @@ def get_connection_or_die():
 
 
 def make_location_table_in_cartodb(carto):
-    sql = (
-        "CREATE TABLE Animal_Locations (ProjectId text NOT NULL, AnimalId text NOT NULL, "
-        "FixDate timestamp NOT NULL, FixId int NOT NULL)"
-    )
+    sql = """
+        CREATE TABLE Animal_Locations
+        (ProjectId text NOT NULL, AnimalId text NOT NULL,
+        FixDate timestamp NOT NULL, FixId int NOT NULL)
+    """
     execute_sql_in_cartodb(carto, sql)
     sql = "select cdb_cartodbfytable('" + secrets.domain + "','Animal_Locations')"
     execute_sql_in_cartodb(carto, sql)
 
 
 def make_movement_table_in_cartodb(carto):
-    sql = (
-        "CREATE TABLE Animal_Movements (ProjectId text NOT NULL, AnimalId text NOT NULL, "
-        "StartDate timestamp NOT NULL, EndDate timestamp NOT NULL, Duration real NOT NULL, "
-        "Distance real NOT NULL, Speed real NOT NULL, "
-        "Duration_t text NULL, Distance_t text NULL, Speed_t text NULL)"
-    )
+    sql = """
+        CREATE TABLE Animal_Movements
+        (ProjectId text NOT NULL, AnimalId text NOT NULL,
+        StartDate timestamp NOT NULL, EndDate timestamp NOT NULL,
+        Duration real NOT NULL, Distance real NOT NULL, Speed real NOT NULL,
+        Duration_t text NULL, Distance_t text NULL, Speed_t text NULL)
+    """
     execute_sql_in_cartodb(carto, sql)
     sql = "select cdb_cartodbfytable('" + secrets.domain + "','Animal_Movements')"
     execute_sql_in_cartodb(carto, sql)
@@ -114,20 +116,20 @@ def chunks(l, n):
 
 
 def make_cartodb_tracking_tables(connection):
-    sql = (
-        "if not exists (select * from sys.tables where name='Locations_In_CartoDB')"
-        "  create table Locations_In_CartoDB (fixid int NOT NULL PRIMARY KEY)"
-    )
-    sql2 = (
-        "if not exists (select * from sys.tables where name='Movements_In_CartoDB')"
-        "  create table Movements_In_CartoDB ("
-        "    ProjectId varchar(16) NOT NULL,"
-        "    AnimalId varchar(16) NOT NULL,"
-        "    StartDate datetime2(7) NOT NULL,"
-        "    EndDate datetime2(7) NOT NULL"
-        "    CONSTRAINT PK_Movements_In_CartoDB PRIMARY KEY CLUSTERED ("
-        "      ProjectId ASC, AnimalId ASC, StartDate ASC, EndDate ASC))"
-    )
+    sql = """
+        if not exists (select * from sys.tables where name='Locations_In_CartoDB')
+        create table Locations_In_CartoDB (fixid int NOT NULL PRIMARY KEY)
+    """
+    sql2 = """
+        if not exists (select * from sys.tables where name='Movements_In_CartoDB')
+          create table Movements_In_CartoDB (
+            ProjectId varchar(16) NOT NULL,
+            AnimalId varchar(16) NOT NULL,
+            StartDate datetime2(7) NOT NULL,
+            EndDate datetime2(7) NOT NULL
+            CONSTRAINT PK_Movements_In_CartoDB PRIMARY KEY CLUSTERED (
+              ProjectId ASC, AnimalId ASC, StartDate ASC, EndDate ASC))
+    """
     wcursor = connection.cursor()
     wcursor.execute(sql)
     wcursor.execute(sql2)
@@ -157,11 +159,14 @@ def add_locations_to_carto_tracking_table(connection, fids):
 def add_movements_to_carto_tracking_table(connection, rows):
     # SQL Server is limited to 1000 rows in an insert
     wcursor = connection.cursor()
-    sql = "insert into Movements_In_CartoDB (projectid, animalid, startdate, enddate) values "
+    sql = """
+        insert into Movements_In_CartoDB
+        (projectid, animalid, startdate, enddate) values
+    """
     for chunk in chunks(rows, 900):
-        values = ",".join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
+        values = ,".join(["('{0}','{1}','{2}','{3}')".format(*row) for row in chunk])
         # print(sql + values)
-        wcursor.execute(sql + values)
+        wcursor.execute(sql + " " + values)
     try:
         wcursor.commit()
     except pyodbc.Error as de:
@@ -187,10 +192,11 @@ def remove_locations_from_carto_tracking_table(connection, fids):
 
 def remove_movements_from_carto_tracking_table(connection, rows):
     wcursor = connection.cursor()
-    sql = (
-        "delete from Movements_In_CartoDB where "
-        "projectid = '{0}' and animalid = '{1}' and startdate = '{2}' and enddate = '{3}'"
-    )
+    sql = """
+        delete from Movements_In_CartoDB where
+        projectid = '{0}' and animalid = '{1}'
+        and startdate = '{2}' and enddate = '{3}'
+    """
     for row in rows:
         sql1 = sql.format(row[0], row[1], row[2], row[3])
         wcursor.execute(sql1)
@@ -213,33 +219,33 @@ def fetch_rows(connection, sql):
 
 
 def get_locations_for_carto(connection, project):
-    sql = (
-        "select l.projectid, l.animalid, l.fixid, l.fixdate,"
-        "location.Lat, Location.Long from locations as l "
-        "left join ProjectExportBoundaries as b on b.Project = l.ProjectId "
-        "left join Locations_In_CartoDB as c on l.fixid = c.fixid "
-        "where c.FixId is null "  # not in CartoDB
-        "and l.ProjectID = '" + project + "' "  # belongs to project
-        "and l.[status] IS NULL "  # not hidden
-        "and (b.shape is null or b.Shape.STContains(l.Location) = 1)"
-    )  # inside boundary
-    return fetch_rows(connection, sql)
+    sql = """
+        select l.projectid, l.animalid, l.fixid, l.fixdate,
+        location.Lat, Location.Long from locations as l
+        left join ProjectExportBoundaries as b on b.Project = l.ProjectId
+        left join Locations_In_CartoDB as c on l.fixid = c.fixid
+        where c.FixId is null -- not in CartoDB
+        and l.ProjectID = '{project}' -- belongs to project
+        and l.[status] IS NULL -- not hidden
+        and (b.shape is null or b.Shape.STContains(l.Location) = 1)
+    """  # inside boundary
+    return fetch_rows(connection, sql.format(project=project))
 
 
 def get_vectors_for_carto(connection, project):
-    sql = (
-        "select m.Projectid, m.AnimalId, m.StartDate, m.EndDate, m.Duration, m.Distance, m.Speed, "
-        "m.Shape.ToString() from movements as m "
-        "inner join ProjectExportBoundaries as b on b.Project = m.ProjectId "
-        "left join Movements_In_CartoDB as c "
-        "on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId "
-        "and m.StartDate = c.StartDate and m.EndDate = c.EndDate "
-        "where c.ProjectId IS NULL "  # not in CartoDB
-        "and m.ProjectId = '" + project + "' "  # belongs to project
-        "and Distance > 0 "  # not a degenerate
-        "and (b.shape is null or b.Shape.STContains(m.shape) = 1)"
-    )  # inside boundary
-    return fetch_rows(connection, sql)
+    sql = """
+        select m.Projectid, m.AnimalId, m.StartDate, m.EndDate, m.Duration, m.Distance, m.Speed,
+        m.Shape.ToString() from movements as m
+        inner join ProjectExportBoundaries as b on b.Project = m.ProjectId
+        left join Movements_In_CartoDB as c
+        on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId
+        and m.StartDate = c.StartDate and m.EndDate = c.EndDate
+        where c.ProjectId IS NULL  -- not in CartoDB
+        and m.ProjectId = '{project}'  -- belongs to project
+        and Distance > 0  -- not a degenerate
+        and (b.shape is null or b.Shape.STContains(m.shape) = 1)
+    """  # inside boundary
+    return fetch_rows(connection, sql.format(project=project))
 
 
 def fixlocationrow(row):
@@ -280,10 +286,10 @@ def insert(am, carto, lrows, vrows):
             print("CartoDB error ocurred", ce)
     if lrows:
         try:
-            sql = (
-                "insert into animal_locations "
-                "(projectid,animalid,fixid,fixdate,the_geom) values "
-            )
+            sql = """
+                insert into animal_locations
+                (projectid,animalid,fixid,fixdate,the_geom) values
+            """
             ids, values = zip(*[(row[2], fixlocationrow(row)) for row in lrows])
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(values, 900):
@@ -301,29 +307,31 @@ def insert(am, carto, lrows, vrows):
 
 def get_locations_to_remove(connection):
     # check the list of location in Cartodb with the current status of locations
-    sql = (
-        "select c.fixid from Locations_In_CartoDB as c "
-        "left join Locations as l on l.FixId = c.fixid "
-        "left join ProjectExportBoundaries as b on b.Project = l.ProjectId "
-        "where l.FixId is null "  # not in location table any longer
-        "or l.status is not null "  # location is now hidden
-        "or (b.shape is not null and b.shape.STContains(l.Location) = 0)"
-    )  # location is now outside boundary
+    # location is now outside boundary
+    sql = """
+        select c.fixid from Locations_In_CartoDB as c
+        left join Locations as l on l.FixId = c.fixid
+        left join ProjectExportBoundaries as b on b.Project = l.ProjectId
+        where l.FixId is null -- not in location table any longer
+        or l.status is not null -- location is now hidden
+        or (b.shape is not null and b.shape.STContains(l.Location) = 0)
+    """
     return fetch_rows(connection, sql)
 
 
 def get_vectors_to_remove(connection):
     # check the list of movements in Cartodb with the current movements table
     # note: the attributes of a movement are immutable
-    sql = (
-        "select c.Projectid, c.AnimalId, c.StartDate, c.EndDate "
-        "from Movements_In_CartoDB as c left join movements as m "
-        "on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId "
-        "and m.StartDate = c.StartDate and m.EndDate = c.EndDate "
-        "left join ProjectExportBoundaries as b on b.Project = m.ProjectId "
-        "where m.projectid is null "  # not in movement database anylonger
-        "or (b.shape is not null and b.shape.STContains(m.shape) = 0)"
-    )  # location is now outside boundary
+    # location is now outside boundary
+    sql = """
+        select c.Projectid, c.AnimalId, c.StartDate, c.EndDate
+        from Movements_In_CartoDB as c left join movements as m
+        on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId
+        and m.StartDate = c.StartDate and m.EndDate = c.EndDate
+        left join ProjectExportBoundaries as b on b.Project = m.ProjectId
+        where m.projectid is null -- not in movement database anylonger
+        or (b.shape is not null and b.shape.STContains(m.shape) = 0)
+    """
     return fetch_rows(connection, sql)
 
 
@@ -336,10 +344,11 @@ def remove(am, carto, lrows, vrows):
         return
     if vrows:
         try:
-            sql = (
-                "delete from animal_movements where "
-                "projectid = '{0}' and animalid = '{1}' and startdate = '{2}' and enddate = '{3}'"
-            )
+            sql = """
+                delete from animal_movements where
+                projectid = '{0}' and animalid = '{1}'
+                and startdate = '{2}' and enddate = '{3}'
+            """
             for row in vrows:
                 sql1 = sql.format(row[0], row[1], row[2], row[3])
                 carto.sql(sql1)
