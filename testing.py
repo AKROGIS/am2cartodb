@@ -19,11 +19,14 @@ Example SQL request in the browser:
 Third party requirements:
 * cartodb - https://pypi.python.org/pypi/cartodb
   (Note: This module is written for Python 2.5 and does not work with 3.x)
+* requests - https://pypi.python.org/pypi/requests
+  (for simple non-authenticated GET requests)
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from cartodb import CartoDBAPIKey, CartoDBException
+# from cartodb import CartoDBAPIKey, CartoDBException
+import requests
 
 import carto_secrets
 
@@ -32,6 +35,10 @@ class Config(object):
     """Namespace for configuration parameters. Edit as necessary."""
 
     # pylint: disable=useless-object-inheritance,too-few-public-methods
+
+    base_url = "http://{user}.carto.com/api/v2/sql/".format(
+        user=carto_secrets.domain
+    )
 
     # A look up table of testing/configuration queries.
     # The first X queries create and modify new test tables. They have the
@@ -114,6 +121,9 @@ class Config(object):
         9: "DROP TABLE Animal_Locations5",
         # Delete the Animal Movements table
         10: "DROP TABLE Animal_Movements5",
+
+        # Read only public access queries
+
         # Get a count of the records in the Animal Locations table
         11: "SELECT count(*) FROM Animal_Locations",
         # Get the top 10 Location records in database creation order.
@@ -121,7 +131,7 @@ class Config(object):
         # Get a portion of the first 10 Location records in timestamp order.
         13: """
             SELECT FixDate, FixId, ST_AsGeoJSON(the_geom)
-            FROM Animal_Locations ORDER BY FixDate LIMIT 10"
+            FROM Animal_Locations ORDER BY FixDate LIMIT 10
         """,
         # Get the date range of the Location records
         14: """
@@ -135,7 +145,7 @@ class Config(object):
         # Get a portion of the first 10 Movement records in timestamp order.
         17: """
             SELECT StartDate, ST_AsGeoJSON(the_geom)
-            FROM Animal_Movements ORDER BY StartDate LIMIT 10"
+            FROM Animal_Movements ORDER BY StartDate LIMIT 10
         """,
         # Get the date range of the Movement records
         18: """
@@ -162,4 +172,24 @@ def test(query):
         print("Some error ocurred {0}".format(ex))
 
 
-test(Config.queries[15])
+def public_query(query):
+    """Run a public (non-authenticated test query and print the results (or error)."""
+
+    url = "{0}?q={1}".format(Config.base_url, query)
+    print(url)
+    try:
+        result = requests.get(url)
+        print(result.json())
+    except requests.exceptions.RequestException as ex:
+        print("Some error ocurred {0}".format(ex))
+
+def public_tests():
+    """Run all public (non-authenticated test queries and print the results (or error)."""
+
+    for i in range(11, 19):
+        print("\nTest #{0}: ".format(i), end="")
+        public_query(Config.queries[i])
+
+
+# test(Config.queries[15])
+public_tests()
