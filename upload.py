@@ -12,7 +12,7 @@ filtered by project and location (if an animal goes outside the protection of
 the park, its location is not published).
 
 You must have a Carto (https://carto.com) (formerly Cartodb) account and
-api key - these are set in the `secrets.py` file.  See `testing_carto.py`
+api key - these are set in the `carto_secrets.py` file.  See `testing_carto.py`
 for a simple example, with explanations.
 
 Third party requirements:
@@ -77,7 +77,7 @@ def make_location_table_in_cartodb(carto):
         FixDate timestamp NOT NULL, FixId int NOT NULL)
     """
     execute_sql_in_cartodb(carto, sql)
-    sql = "select cdb_cartodbfytable('" + secrets.domain + "','Animal_Locations')"
+    sql = "select cdb_cartodbfytable('" + carto_secrets.domain + "','Animal_Locations')"
     execute_sql_in_cartodb(carto, sql)
 
 
@@ -92,7 +92,7 @@ def make_movement_table_in_cartodb(carto):
         Duration_t text NULL, Distance_t text NULL, Speed_t text NULL)
     """
     execute_sql_in_cartodb(carto, sql)
-    sql = "select cdb_cartodbfytable('" + secrets.domain + "','Animal_Movements')"
+    sql = "select cdb_cartodbfytable('" + carto_secrets.domain + "','Animal_Movements')"
     execute_sql_in_cartodb(carto, sql)
 
 
@@ -445,7 +445,7 @@ def fix_format_of_vector_columns(carto):
 def make_carto_tables():
     """Create the movement and location tables in Carto."""
 
-    carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
+    carto_conn = CartoDBAPIKey(carto_secrets.apikey, carto_secrets.domain)
     make_location_table_in_cartodb(carto_conn)
     make_movement_table_in_cartodb(carto_conn)
 
@@ -460,7 +460,7 @@ def make_sqlserver_tables():
 def main():
     """Update the Carto tables with changes in the Animal Movements tables."""
 
-    carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
+    carto_conn = CartoDBAPIKey(carto_secrets.apikey, carto_secrets.domain)
     am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     locations = get_locations_to_remove(am_conn)
     vectors = get_vectors_to_remove(am_conn)
