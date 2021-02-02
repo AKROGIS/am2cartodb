@@ -420,7 +420,13 @@ def remove(database, carto, l_rows, v_rows):
 
 
 def fix_format_of_vector_columns(carto):
-    """Update the format of attributes in the movement table on carto."""
+    """
+    Populate the derived/formatted text fields in the carto database.
+
+    The Duration, Speed, and Duration values are numeric which display
+    a lot of noise.  For reasons now forgotten, I created text fields
+    with the values rounded to 1 decimal place.
+    """
 
     sql = """
         update animal_movements
