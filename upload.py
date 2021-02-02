@@ -28,6 +28,12 @@ import sys
 import secrets
 
 
+# Python 2/3 compatible xrange cabability
+# pylint: disable=undefined-variable,redefined-builtin
+if sys.version_info[0] < 3:
+    range = xrange
+
+
 def module_missing(name):
     print('Module {0} not found, make sure it is installed.'.format(name))
     exec_dir = os.path.split(sys.executable)[0]
@@ -95,7 +101,7 @@ def execute_sql_in_cartodb(carto, sql):
 
 def chunks(l, n):
     """Yield successive n-sized chunks from list l."""
-    for i in xrange(0, len(l), n):
+    for i in range(0, len(l), n):
         yield l[i:i+n]
 
 
@@ -157,7 +163,7 @@ def remove_locations_from_carto_tracking_table(connection, fids):
     sql = "delete from Locations_In_CartoDB where fixid in "
     # Protection from really long lists, by executing multiple queries.
     for chunk in chunks(fids, 900):
-        ids = '(' + ','.join([str(fid) for fid in chunk]) + ')'
+        ids = '(' + ','.join(["{0}".format(fid) for fid in chunk]) + ')'
         wcursor.execute(sql + ids)
     try:
         wcursor.commit()
@@ -246,7 +252,7 @@ def insert(am, carto, lrows, vrows):
                 carto.sql(sql + values)
             try:
                 add_movements_to_carto_tracking_table(am, vrows)
-                print('Wrote ' + str(len(vrows)) + ' movements to CartoDB.')
+                print('Wrote {0} movements to CartoDB.'.format(len(vrows)))
             except pyodbc.Error as de:
                 print ("Database error ocurred", de)
         except CartoDBException as ce:
@@ -263,7 +269,7 @@ def insert(am, carto, lrows, vrows):
                 carto.sql(sql + vals)
             try:
                 add_locations_to_carto_tracking_table(am, ids)
-                print('Wrote ' + str(len(ids)) + ' locations to CartoDB.')
+                print('Wrote {0} locations to CartoDB.'.format(len(ids)))
             except pyodbc.Error as de:
                 print ("Database error ocurred", de)
         except CartoDBException as ce:
@@ -310,7 +316,7 @@ def remove(am, carto, lrows, vrows):
                 carto.sql(sql1)
             try:
                 remove_movements_from_carto_tracking_table(am, vrows)
-                print('Removed ' + str(len(vrows)) + ' Movements from CartoDB.')
+                print('Removed {0} Movements from CartoDB.'.format(len(vrows)))
             except pyodbc.Error as de:
                 print ("SQLServer error occurred.  Movements removed from CartoDB, but not SQLServer", de)
         except CartoDBException as ce:
@@ -321,11 +327,11 @@ def remove(am, carto, lrows, vrows):
             ids = [row[0] for row in lrows]
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(ids, 900):
-                idstr = '(' + ','.join([str(i) for i in chunk]) + ')'
+                idstr = '(' + ','.join(["{0}".format(i) for i in chunk]) + ')'
                 carto.sql(sql + idstr)
             try:
                 remove_locations_from_carto_tracking_table(am, ids)
-                print('Removed ' + str(len(ids)) + ' locations from CartoDB.')
+                print('Removed {0} locations from CartoDB.'.format(len(ids)))
             except pyodbc.Error as de:
                 print ("SQLServer error occurred.  Locations removed from CartoDB, but not SQLServer", de)
         except CartoDBException as ce:
