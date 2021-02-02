@@ -25,6 +25,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 
+from cartodb import CartoDBAPIKey, CartoDBException
+import pyodbc
+
 import secrets
 
 
@@ -34,30 +37,7 @@ if sys.version_info[0] < 3:
     range = xrange
 
 
-def module_missing(name):
-    print("Module {0} not found, make sure it is installed.".format(name))
-    exec_dir = os.path.split(sys.executable)[0]
-    pip = os.path.join(exec_dir, "Scripts", "pip.exe")
-    if not os.path.exists(pip):
-        print(
-            "First install pip. See instructions at: "
-            "'https://pip.pypa.io/en/stable/installing/'."
-        )
-    print("Install with: {0} install {1}".format(pip, name))
-    sys.exit()
 
-
-try:
-    from cartodb import CartoDBAPIKey, CartoDBException
-except ImportError:
-    CartoDBAPIKey, CartoDBException = None, None
-    module_missing("cartodb")
-
-try:
-    import pyodbc
-except ImportError:
-    pyodbc = None
-    module_missing("pyodbc")
 
 
 def get_connection_or_die():
