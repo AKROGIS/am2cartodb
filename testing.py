@@ -45,5 +45,5 @@ def test(c):
     except CartoDBException as e:
        print ("some error ocurred", e)
 
-carto = CartoDBAPIKey(secrets.apikey, secrets.domain)
+carto = CartoDBAPIKey(carto_secrets.apikey, carto_secrets.domain)
 test(carto)
