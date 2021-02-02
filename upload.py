@@ -22,7 +22,6 @@ Third party requirements:
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import sys
 
 from cartodb import CartoDBAPIKey, CartoDBException
@@ -37,25 +36,36 @@ if sys.version_info[0] < 3:
     range = xrange
 
 
+def get_connection_or_die(server, database):
+    """
+    Get a Trusted pyodbc connection to the SQL Server database on server.
 
+    Try several connection strings.
+    See https://github.com/mkleehammer/pyodbc/wiki/Connecting-to-SQL-Server-from-Windows
 
-
-def get_connection_or_die():
-    conn_string = (
-        "DRIVER={{SQL Server Native Client 11.0}};"
-        "SERVER={0};DATABASE={1};Trusted_Connection=Yes;"
-    )
-    conn_string = conn_string.format("inpakrovmais", "animal_movement")
-    try:
-        connection = pyodbc.connect(conn_string)
-    except pyodbc.Error as ex:
-        print("Rats!!  Unable to connect to the database.")
-        print("Make sure your AD account has the proper DB permissions.")
-        print("Contact Regan (regan_sarwas@nps.gov) for assistance.")
-        print("  Connection: " + conn_string)
-        print("  Error: {0}".format(ex))
-        sys.exit()
-    return connection
+    Exit with an error message if there is no successful connection.
+    """
+    drivers = [
+        "{ODBC Driver 17 for SQL Server}",  # supports SQL Server 2008 through 2017
+        "{ODBC Driver 13.1 for SQL Server}",  # supports SQL Server 2008 through 2016
+        "{ODBC Driver 13 for SQL Server}",  # supports SQL Server 2005 through 2016
+        "{ODBC Driver 11 for SQL Server}",  # supports SQL Server 2005 through 2014
+        "{SQL Server Native Client 11.0}",  # DEPRECATED: released with SQL Server 2012
+        # '{SQL Server Native Client 10.0}',    # DEPRECATED: released with SQL Server 2008
+    ]
+    conn_template = "DRIVER={0};SERVER={1};DATABASE={2};Trusted_Connection=Yes;"
+    for driver in drivers:
+        conn_string = conn_template.format(driver, server, database)
+        try:
+            connection = pyodbc.connect(conn_string)
+            return connection
+        except pyodbc.Error:
+            pass
+    print("Rats!! Unable to connect to the database.")
+    print("Make sure you have an ODBC driver installed for SQL Server")
+    print("and your AD account has the proper DB permissions.")
+    print("Contact akro_gis_helpdesk@nps.gov for assistance.")
+    sys.exit()
 
 
 def make_location_table_in_cartodb(carto):
@@ -390,13 +400,13 @@ def make_carto_tables():
 
 
 def make_sqlserver_tables():
-    am_conn = get_connection_or_die()
+    am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     make_cartodb_tracking_tables(am_conn)
 
 
 def main():
     carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
-    am_conn = get_connection_or_die()
+    am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     locations = get_locations_to_remove(am_conn)
     vectors = get_vectors_to_remove(am_conn)
     remove(am_conn, carto_conn, locations, vectors)
