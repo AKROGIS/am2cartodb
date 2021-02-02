@@ -261,10 +261,11 @@ def insert(am, carto, lrows, vrows):
         return
     if vrows:
         try:
-            sql = (
-                "insert into animal_movements "
-                "(projectid, animalid, startdate, enddate, duration, distance, speed, the_geom) values "
-            )
+            sql = """
+                insert into animal_movements
+                (projectid, animalid, startdate, enddate, duration,
+                distance, speed, the_geom) values
+            """
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(vrows, 900):
                 values = ",".join([fixmovementrow(row) for row in chunk])
@@ -373,11 +374,23 @@ def remove(am, carto, lrows, vrows):
 
 
 def fix_format_of_vector_columns(carto):
-    sql = "update animal_movements set distance_t=round(cast(distance as numeric),1) where distance_t is null"
+    sql = """
+        update animal_movements
+        set distance_t=round(cast(distance as numeric),1)
+        where distance_t is null
+    """
     execute_sql_in_cartodb(carto, sql)
-    sql = "update animal_movements set duration_t=round(cast(duration as numeric),1) where duration_t is null"
+    sql = """
+        update animal_movements
+        set duration_t=round(cast(duration as numeric),1)
+        where duration_t is null
+    """
     execute_sql_in_cartodb(carto, sql)
-    sql = "update animal_movements set speed_t=round(cast(speed as numeric),1) where speed_t is null"
+    sql = """
+        update animal_movements
+        set speed_t=round(cast(speed as numeric),1)
+        where speed_t is null
+    """
     execute_sql_in_cartodb(carto, sql)
 
 
