@@ -69,6 +69,8 @@ def get_connection_or_die(server, database):
 
 
 def make_location_table_in_cartodb(carto):
+    """Execute SQL on the carto server to create the Animal_Locations table."""
+
     sql = """
         CREATE TABLE Animal_Locations
         (ProjectId text NOT NULL, AnimalId text NOT NULL,
@@ -80,6 +82,8 @@ def make_location_table_in_cartodb(carto):
 
 
 def make_movement_table_in_cartodb(carto):
+    """Execute SQL on the carto server to create the Animal_Movements table."""
+
     sql = """
         CREATE TABLE Animal_Movements
         (ProjectId text NOT NULL, AnimalId text NOT NULL,
@@ -93,6 +97,8 @@ def make_movement_table_in_cartodb(carto):
 
 
 def execute_sql_in_cartodb(carto, sql):
+    """Execute SQL statement sql on carto server connection."""
+
     try:
         carto.sql(sql)
     except CartoDBException as ex:
@@ -101,11 +107,14 @@ def execute_sql_in_cartodb(carto, sql):
 
 def chunks(items, count):
     """Yield successive count-sized chunks from list items."""
+
     for i in range(0, len(items), count):
         yield items[i : i + count]
 
 
 def make_cartodb_tracking_tables(connection):
+    """Execute SQL to create tracking tables on the SQL Server connection."""
+
     sql = """
         if not exists (select * from sys.tables where name='Locations_In_CartoDB')
         create table Locations_In_CartoDB (fixid int NOT NULL PRIMARY KEY)
@@ -131,6 +140,8 @@ def make_cartodb_tracking_tables(connection):
 
 
 def add_locations_to_carto_tracking_table(connection, fids):
+    """Execute SQL to track location fids on the SQL Server connection."""
+
     # SQL Server is limited to 1000 rows in an insert
     wcursor = connection.cursor()
     sql = "INSERT Locations_In_CartoDB (fixid) values "
@@ -147,6 +158,8 @@ def add_locations_to_carto_tracking_table(connection, fids):
 
 
 def add_movements_to_carto_tracking_table(connection, rows):
+    """Execute SQL to track movement rows on the SQL Server connection."""
+
     # SQL Server is limited to 1000 rows in an insert
     wcursor = connection.cursor()
     sql = """
@@ -166,6 +179,8 @@ def add_movements_to_carto_tracking_table(connection, rows):
 
 
 def remove_locations_from_carto_tracking_table(connection, fids):
+    """Execute SQL to un-track location fids on the SQL Server connection."""
+
     wcursor = connection.cursor()
     sql = "delete from Locations_In_CartoDB where fixid in "
     # Protection from really long lists, by executing multiple queries.
@@ -181,6 +196,8 @@ def remove_locations_from_carto_tracking_table(connection, fids):
 
 
 def remove_movements_from_carto_tracking_table(connection, rows):
+    """Execute SQL to un-track movement rows on the SQL Server connection."""
+
     wcursor = connection.cursor()
     sql = """
         delete from Movements_In_CartoDB where
@@ -199,6 +216,8 @@ def remove_movements_from_carto_tracking_table(connection, rows):
 
 
 def fetch_rows(connection, sql):
+    """Execute SQL statement sql on the SQL Server connection and return rows."""
+
     rcursor = connection.cursor()
     try:
         rows = rcursor.execute(sql).fetchall()
@@ -209,6 +228,8 @@ def fetch_rows(connection, sql):
 
 
 def get_locations_for_carto(connection, project):
+    """Return the new locations for project from the SQL Server connection."""
+
     sql = """
         select l.projectid, l.animalid, l.fixid, l.fixdate,
         location.Lat, Location.Long from locations as l
@@ -223,6 +244,8 @@ def get_locations_for_carto(connection, project):
 
 
 def get_vectors_for_carto(connection, project):
+    """Return the new movements for project from the SQL Server connection."""
+
     sql = """
         select m.Projectid, m.AnimalId, m.StartDate, m.EndDate, m.Duration, m.Distance, m.Speed,
         m.Shape.ToString() from movements as m
@@ -239,16 +262,26 @@ def get_vectors_for_carto(connection, project):
 
 
 def fixlocationrow(row):
+    """Return a modified location row; from SQL Server to Postgres (carto)."""
+
     text = "('{0}','{1}',{2},'{3}',ST_SetSRID(ST_Point({5},{4}),4326))"
     return text.format(*row)
 
 
 def fixmovementrow(row):
+    """Return a modified movement row; from SQL Server to Postgres (carto)."""
+
     text = "('{0}','{1}','{2}','{3}',{4},{5},{6},ST_GeometryFromText('{7}',4326))"
     return text.format(*row)
 
 
 def insert(database, carto, lrows, vrows):
+    """
+    Send locations and movement vectors from connection to carto.
+
+    locations (lrows) and movement vectors (vrows) will be marked as tracked
+    on the source SQL Server connection and inserted on the tables on carto.
+    """
     if not lrows:
         print("No locations to send to CartoDB.")
     if not vrows:
@@ -296,8 +329,12 @@ def insert(database, carto, lrows, vrows):
 
 
 def get_locations_to_remove(connection):
-    # check the list of location in Cartodb with the current status of locations
-    # location is now outside boundary
+    """
+    Return the locations in SQL Server connection that should be removed from carto.
+
+    Check the list of location in Cartodb with the current status of locations
+    (hidden or deleted) or the boundary shape may have changed.
+    """
     sql = """
         select c.fixid from Locations_In_CartoDB as c
         left join Locations as l on l.FixId = c.fixid
@@ -310,9 +347,13 @@ def get_locations_to_remove(connection):
 
 
 def get_vectors_to_remove(connection):
-    # check the list of movements in Cartodb with the current movements table
-    # note: the attributes of a movement are immutable
-    # location is now outside boundary
+    """
+    Return the movements in SQL Server connection that should be removed from carto.
+
+    Check the list of movements in Cartodb with the current status of movements
+    (deleted) or the boundary shape may have changed. Note: the attributes of a
+    movement are immutable, so we do not need to check them.
+    """
     sql = """
         select c.Projectid, c.AnimalId, c.StartDate, c.EndDate
         from Movements_In_CartoDB as c left join movements as m
@@ -326,6 +367,12 @@ def get_vectors_to_remove(connection):
 
 
 def remove(database, carto, lrows, vrows):
+    """
+    Remove locations and movement vectors from carto.
+
+    locations (lrows) and movement vectors (vrows) will be marked as un-tracked
+    on the source SQL Server connection and removed from the tables on carto.
+    """
     if not lrows:
         print("No locations to remove from CartoDB.")
     if not vrows:
@@ -373,6 +420,8 @@ def remove(database, carto, lrows, vrows):
 
 
 def fix_format_of_vector_columns(carto):
+    """Update the format of attributes in the movement table on carto."""
+
     sql = """
         update animal_movements
         set distance_t=round(cast(distance as numeric),1)
@@ -394,17 +443,23 @@ def fix_format_of_vector_columns(carto):
 
 
 def make_carto_tables():
+    """Create the movement and location tables in Carto."""
+
     carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
     make_location_table_in_cartodb(carto_conn)
     make_movement_table_in_cartodb(carto_conn)
 
 
 def make_sqlserver_tables():
+    """Create the tracking tables in SQL Server."""
+
     am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     make_cartodb_tracking_tables(am_conn)
 
 
 def main():
+    """Update the Carto tables with changes in the Animal Movements tables."""
+
     carto_conn = CartoDBAPIKey(secrets.apikey, secrets.domain)
     am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     locations = get_locations_to_remove(am_conn)
