@@ -17,7 +17,8 @@ Example SQL request in the browser:
   https://{domain}.carto.com/api/v2/sql?api_key={apikey}&q={sql}
 
 Third party requirements:
-* carto - https://pypi.python.org/pypi/carto  (formerly cartodb)
+* cartodb - https://pypi.python.org/pypi/cartodb
+  (Note: This module is written for Python 2.5 and does not work with 3.x)
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
