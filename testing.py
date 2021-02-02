@@ -24,7 +24,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from cartodb import CartoDBAPIKey, CartoDBException
 
-import secrets
+import carto_secrets
 
 
 # example sql in browser:

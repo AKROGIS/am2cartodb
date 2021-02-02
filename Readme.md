@@ -26,10 +26,10 @@ and the
 These can be installed with `pip install pyodbc` and
 `pip install cartodb`.
 
-Copy the `secrets.py.example` file to `secrets.py` and
+Copy the `carto_secrets.py.example` file to `carto_secrets.py` and
 edit with your cartodb account and an API Key.
 AKRO GIS staff can find these and a completed
-`secrets.py` file in the password keeper on the
+`carto_secrets.py` file in the password keeper on the
 team network drive.
 
 ## Deploy

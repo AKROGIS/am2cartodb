@@ -27,7 +27,7 @@ import sys
 from cartodb import CartoDBAPIKey, CartoDBException
 import pyodbc
 
-import secrets
+import carto_secrets
 
 
 # Python 2/3 compatible xrange cabability
