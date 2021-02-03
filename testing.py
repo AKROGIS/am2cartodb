@@ -247,7 +247,7 @@ def public_queries():
 # auth_query(Config.queries[1])
 
 # Run all public query
-# public_queries()
+public_queries()
 
 # Run all authenticated query
 # auth_queries()
