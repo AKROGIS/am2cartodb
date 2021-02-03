@@ -5,7 +5,7 @@ A python tool for publishing select data from the
 database (an internal SQL Server) to a Hosted [Carto](https://carto.com) or
 an on-premises [Carto](https://carto.nps.gov) database. The hosted account was
 copied to an on-premises server in November of 2019 and is no longer active.
-database.  The tool keeps track of what data has already been published, and
+The tool keeps track of what data has already been published, and
 only pushes changes since the last run.  It is best run as a scheduled task.
 
 Biologists with data in Animal Movements must elect to publish their data to
