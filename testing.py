@@ -58,9 +58,13 @@ class Config(object):
 
     # pylint: disable=useless-object-inheritance,too-few-public-methods
 
-    # On premises read/write
+    # On premises  Carto server
     base_url = "https://carto.nps.gov/user/{user}/".format(user=carto_secrets.user)
-    # Hosted read
+    # Hosted Carto server
+    # May vary if you have an organizational account or not
+    # The first line still works for reading, however as of 2021, it appears
+    # the hosted account no longer allows edits or any account modifications.
+    # so write testing was not possible.
     # base_url = "https://{user}.carto.com/"
     # base_url = "https://nationalparkservice.carto.com/user/{user}/"
 

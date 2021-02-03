@@ -2,7 +2,9 @@
 """
 A python tool for publishing select data from the
 [Animal Movement](https://github.com/AKROGIS/AnimalMovement)
-database (an internal SQL Server) to a public [Carto](https://carto.com)
+database (an internal SQL Server) to a Hosted [Carto](https://carto.com) or
+an on-premises [Carto](https://carto.nps.gov) database. The hosted account was
+copied to an on-premises server in November of 2019 and is no longer active.
 database.  The tool keeps track of what data has already been published, and
 only pushes changes since the last run.  It is best run as a scheduled task.
 
@@ -12,8 +14,13 @@ filtered by project and location (if an animal goes outside the protection of
 the park, its location is not published).
 
 You must have a Carto (https://carto.com) (formerly Cartodb) account and
-api key - these are set in the `carto_secrets.py` file.  See `testing_carto.py`
-for a simple example, with explanations.
+apikey - these are set in the `carto_secrets.py` file.  Note that the apikey is
+not required for select statements on a public table.  This code will work with
+an hosted server on carto.com, or an on premises installation. Modify the
+base_url value in the Config object as needed.
+
+See the comments in the header or `testing.py` if you get SSL Verification
+errors.
 
 Third party requirements:
 * carto - https://pypi.python.org/pypi/carto  (formerly cartodb)
@@ -24,7 +31,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 
-from cartodb import CartoDBAPIKey, CartoDBException
+from carto.auth import APIKeyAuthClient
+from carto.sql import SQLClient, CartoException
 import pyodbc
 
 import carto_secrets
@@ -34,6 +42,15 @@ import carto_secrets
 # pylint: disable=undefined-variable,redefined-builtin
 if sys.version_info[0] < 3:
     range = xrange
+
+
+class Config(object):
+    """Namespace for configuration parameters. Edit as necessary."""
+
+    # pylint: disable=useless-object-inheritance,too-few-public-methods
+
+    # On premises Carto server
+    base_url = "https://carto.nps.gov/user/{user}/".format(user=carto_secrets.user)
 
 
 def get_connection_or_die(server, database):
@@ -77,7 +94,7 @@ def make_location_table_in_cartodb(carto):
         FixDate timestamp NOT NULL, FixId int NOT NULL)
     """
     execute_sql_in_cartodb(carto, sql)
-    sql = "select cdb_cartodbfytable('" + carto_secrets.domain + "','Animal_Locations')"
+    sql = "select cdb_cartodbfytable('" + carto_secrets.user + "','Animal_Locations')"
     execute_sql_in_cartodb(carto, sql)
 
 
@@ -92,7 +109,7 @@ def make_movement_table_in_cartodb(carto):
         Duration_t text NULL, Distance_t text NULL, Speed_t text NULL)
     """
     execute_sql_in_cartodb(carto, sql)
-    sql = "select cdb_cartodbfytable('" + carto_secrets.domain + "','Animal_Movements')"
+    sql = "select cdb_cartodbfytable('" + carto_secrets.user + "','Animal_Movements')"
     execute_sql_in_cartodb(carto, sql)
 
 
@@ -100,9 +117,9 @@ def execute_sql_in_cartodb(carto, sql):
     """Execute SQL statement sql on carto server connection."""
 
     try:
-        carto.sql(sql)
-    except CartoDBException as ex:
-        print("CartoDB error ocurred", ex)
+        carto.send(sql)
+    except CartoException as ex:
+        print("Carto error ocurred", ex)
 
 
 def chunks(items, count):
@@ -235,7 +252,7 @@ def get_locations_for_carto(connection, project):
         location.Lat, Location.Long from locations as l
         left join ProjectExportBoundaries as b on b.Project = l.ProjectId
         left join Locations_In_CartoDB as c on l.fixid = c.fixid
-        where c.FixId is null -- not in CartoDB
+        where c.FixId is null -- not in Carto
         and l.ProjectID = '{project}' -- belongs to project
         and l.[status] IS NULL -- not hidden
         and (b.shape is null or b.Shape.STContains(l.Location) = 1)
@@ -253,7 +270,7 @@ def get_vectors_for_carto(connection, project):
         left join Movements_In_CartoDB as c
         on m.ProjectId = c.ProjectId and m.AnimalId = c.AnimalId
         and m.StartDate = c.StartDate and m.EndDate = c.EndDate
-        where c.ProjectId IS NULL  -- not in CartoDB
+        where c.ProjectId IS NULL  -- not in Carto
         and m.ProjectId = '{project}'  -- belongs to project
         and Distance > 0  -- not a degenerate
         and (b.shape is null or b.Shape.STContains(m.shape) = 1)
@@ -283,9 +300,9 @@ def insert(database, carto, l_rows, v_rows):
     on the source SQL Server connection and inserted on the tables on carto.
     """
     if not l_rows:
-        print("No locations to send to CartoDB.")
+        print("No locations to send to Carto.")
     if not v_rows:
-        print("No movements to send to CartoDB.")
+        print("No movements to send to Carto.")
     if not l_rows and not v_rows:
         return
     if v_rows:
@@ -299,14 +316,14 @@ def insert(database, carto, l_rows, v_rows):
             for chunk in chunks(v_rows, 900):
                 values = ",".join([fixmovementrow(row) for row in chunk])
                 # print(sql + values)
-                carto.sql(sql + values)
+                carto.send(sql + values)
             try:
                 add_movements_to_carto_tracking_table(database, v_rows)
-                print("Wrote {0} movements to CartoDB.".format(len(v_rows)))
+                print("Wrote {0} movements to Carto.".format(len(v_rows)))
             except pyodbc.Error as ex:
                 print("Database error ocurred", ex)
-        except CartoDBException as ex:
-            print("CartoDB error ocurred", ex)
+        except CartoException as ex:
+            print("Carto error ocurred", ex)
     if l_rows:
         try:
             sql = """
@@ -318,14 +335,14 @@ def insert(database, carto, l_rows, v_rows):
             for chunk in chunks(values, 900):
                 values = ",".join(chunk)
                 # (sql + values)
-                carto.sql(sql + values)
+                carto.send(sql + values)
             try:
                 add_locations_to_carto_tracking_table(database, ids)
-                print("Wrote {0} locations to CartoDB.".format(len(ids)))
+                print("Wrote {0} locations to Carto.".format(len(ids)))
             except pyodbc.Error as ex:
                 print("Database error ocurred", ex)
-        except CartoDBException as ex:
-            print("CartoDB error ocurred", ex)
+        except CartoException as ex:
+            print("Carto error ocurred", ex)
 
 
 def get_locations_to_remove(connection):
@@ -374,9 +391,9 @@ def remove(database, carto, l_rows, v_rows):
     on the source SQL Server connection and removed from the tables on carto.
     """
     if not l_rows:
-        print("No locations to remove from CartoDB.")
+        print("No locations to remove from Carto.")
     if not v_rows:
-        print("No movements to remove from CartoDB.")
+        print("No movements to remove from Carto.")
     if not l_rows and not v_rows:
         return
     if v_rows:
@@ -388,17 +405,17 @@ def remove(database, carto, l_rows, v_rows):
             """
             for row in v_rows:
                 sql1 = sql.format(row[0], row[1], row[2], row[3])
-                carto.sql(sql1)
+                carto.send(sql1)
             try:
                 remove_movements_from_carto_tracking_table(database, v_rows)
-                print("Removed {0} Movements from CartoDB.".format(len(v_rows)))
+                print("Removed {0} Movements from Carto.".format(len(v_rows)))
             except pyodbc.Error as ex:
                 print(
-                    "SQLServer error occurred.  Movements removed from CartoDB, but not SQLServer",
+                    "SQLServer error occurred.  Movements removed from Carto, but not SQLServer",
                     ex,
                 )
-        except CartoDBException as ex:
-            print("CartoDB error occurred removing movements.", ex)
+        except CartoException as ex:
+            print("Carto error occurred removing movements.", ex)
     if l_rows:
         try:
             sql = "delete from animal_locations where fixid in "
@@ -406,17 +423,17 @@ def remove(database, carto, l_rows, v_rows):
             # Protection from really long lists, by executing multiple queries.
             for chunk in chunks(ids, 900):
                 id_str = "(" + ",".join(["{0}".format(i) for i in chunk]) + ")"
-                carto.sql(sql + id_str)
+                carto.send(sql + id_str)
             try:
                 remove_locations_from_carto_tracking_table(database, ids)
-                print("Removed {0} locations from CartoDB.".format(len(ids)))
+                print("Removed {0} locations from Carto.".format(len(ids)))
             except pyodbc.Error as ex:
                 print(
-                    "SQLServer error occurred.  Locations removed from CartoDB, but not SQLServer",
+                    "SQLServer error occurred.  Locations removed from Carto, but not SQLServer",
                     ex,
                 )
-        except CartoDBException as ex:
-            print("CartoDB error occurred removing locations.", ex)
+        except CartoException as ex:
+            print("Carto error occurred removing locations.", ex)
 
 
 def fix_format_of_vector_columns(carto):
@@ -448,10 +465,20 @@ def fix_format_of_vector_columns(carto):
     execute_sql_in_cartodb(carto, sql)
 
 
+def get_auth_carto_sql_connection():
+    """Return a authorized SQL connection to the carto database, using the secrets."""
+
+    auth_client = APIKeyAuthClient(
+        api_key=carto_secrets.apikey,
+        base_url=Config.base_url,
+    )
+    return SQLClient(auth_client)
+
+
 def make_carto_tables():
     """Create the movement and location tables in Carto."""
 
-    carto_conn = CartoDBAPIKey(carto_secrets.apikey, carto_secrets.domain)
+    carto_conn = get_auth_carto_sql_connection()
     make_location_table_in_cartodb(carto_conn)
     make_movement_table_in_cartodb(carto_conn)
 
@@ -466,7 +493,7 @@ def make_sqlserver_tables():
 def main():
     """Update the Carto tables with changes in the Animal Movements tables."""
 
-    carto_conn = CartoDBAPIKey(carto_secrets.apikey, carto_secrets.domain)
+    carto_conn = get_auth_carto_sql_connection()
     am_conn = get_connection_or_die("inpakrovmais", "animal_movement")
     locations = get_locations_to_remove(am_conn)
     vectors = get_vectors_to_remove(am_conn)
