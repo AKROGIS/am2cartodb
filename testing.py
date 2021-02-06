@@ -52,6 +52,11 @@ import requests
 
 import carto_secrets
 
+# Python 2/3 compatible xrange() cabability
+# pylint: disable=undefined-variable,redefined-builtin
+if sys.version_info[0] < 3:
+    range = xrange
+
 
 class Config(object):
     """Namespace for configuration parameters. Edit as necessary."""
