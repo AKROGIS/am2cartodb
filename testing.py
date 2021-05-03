@@ -43,6 +43,8 @@ Third party requirements:
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import sys
+
 from carto.auth import APIKeyAuthClient
 
 # To disable SSL certificate verification (unsafe)
